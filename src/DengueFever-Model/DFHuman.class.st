@@ -19,6 +19,8 @@ DFHuman >> commute [
     
     dayStep = 1 ifTrue: [ self moveTo: workCell ].
     dayStep = 3 ifTrue: [ self moveTo: homeCell ].
+
+	"self moveTowards: self workCell"
 ]
 
 { #category : 'accessing' }
@@ -76,6 +78,12 @@ DFHuman >> pov [
 		shape: #star size: 0.8
 ]
 
+{ #category : 'accessing' }
+DFHuman >> randomStep [ 
+	self randomWalk.
+	self updateState.
+]
+
 { #category : 'as yet unclassified' }
 DFHuman >> selectHomeCell [
     | cityCells index |
@@ -96,13 +104,20 @@ DFHuman >> selectWorkCell [
 ]
 
 { #category : 'accessing' }
-DFHuman >> step [ 
-  self commute. 
-  incubationPeriod isNil ifFalse: [
-  incubationPeriod := incubationPeriod - 1.
-    incubationPeriod = 0 ifTrue: [
-        self isInfected: true.
-        incubationPeriod := nil ] ].
+DFHuman >> step [
+
+	self commute.
+	self updateState
+]
+
+{ #category : 'as yet unclassified' }
+DFHuman >> updateState [
+
+	^ incubationPeriod isNil ifFalse: [
+			  incubationPeriod := incubationPeriod - 1.
+			  incubationPeriod = 0 ifTrue: [
+					  self isInfected: true.
+					  incubationPeriod := nil ] ]
 ]
 
 { #category : 'accessing' }

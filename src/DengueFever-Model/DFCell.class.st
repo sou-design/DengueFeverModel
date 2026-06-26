@@ -34,6 +34,12 @@ DFCell >> hasWater: aBoolean [
 	hasWater := aBoolean
 ]
 
+{ #category : 'accessing' }
+DFCell >> humans [
+
+	^ self occupantsOfClass: DFHuman
+]
+
 { #category : 'as yet unclassified' }
 DFCell >> initWaterLevel [
 	waterLevel := 0.

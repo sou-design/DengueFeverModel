@@ -31,30 +31,10 @@ DFMosquito >> ageMax: anObject [
 { #category : 'as yet unclassified' }
 DFMosquito >> bite: aDFHuman [ 
 	
-	self isInfected ifTrue: [ aDFHuman incubationPeriod: 5]
-	ifFalse: [ aDFHuman isInfected ifTrue: [ incubationPeriod :=10]].
+	self isInfected ifTrue: [ aDFHuman incubationPeriod: 1]
+	ifFalse: [ aDFHuman isInfected ifTrue: [ incubationPeriod :=2]].
 	hasBlood := true.
 	reproductionPeriod := 2.
-]
-
-{ #category : 'as yet unclassified' }
-DFMosquito >> computeNearestBreedingSite [
-	| visited frontier nextFrontier found |
-	visited := Set new.
-	visited add: self cell.
-	frontier := self cell neighbourhood.
-
-	[ frontier isEmpty ] whileFalse: [
-		found := frontier detect: [ :c | c hasWater ] ifNone: [ nil ].
-		found ifNotNil: [ ^ found ].
-
-		visited addAll: frontier.
-		nextFrontier := OrderedCollection new.
-		frontier do: [ :c |
-			nextFrontier addAll: (c neighbourhood reject: [ :n | visited includes: n ]) ].
-		frontier := nextFrontier asSet asOrderedCollection ].
-
-	^ nil.
 ]
 
 { #category : 'accessing' }
@@ -71,26 +51,32 @@ DFMosquito >> currentAge: anObject [
 
 { #category : 'accessing' }
 DFMosquito >> flyToBreedingSite [
-    | arrived |
-    (targetBreedingSite isNil or: [ targetBreedingSite hasWater not ])
-        ifTrue: [ targetBreedingSite := self computeNearestBreedingSite ].
-    targetBreedingSite ifNil: [ self randomWalk. ^ false ].
+    | arrived mosquitoesOnCell breedingSites |
+    (targetBreedingSite isNil or: [ targetBreedingSite hasWater not ]) ifTrue: [
+        breedingSites := (self cormasModel allEntitiesOfClass: DFCell)
+            select: [ :c | c hasWater ].
+        breedingSites isEmpty ifTrue: [ self randomWalk. ^ false ].
+        targetBreedingSite := breedingSites atRandom ].
     arrived := self cell = targetBreedingSite.
     arrived
-        ifTrue: [ targetBreedingSite := nil ]
-        ifFalse: [ self moveTowards: targetBreedingSite ].
+        ifTrue: [
+            mosquitoesOnCell := (self cormasModel allEntitiesOfClass: DFMosquito)
+                select: [ :o | o cell = targetBreedingSite ].
+            mosquitoesOnCell size > 5 ifTrue: [
+                targetBreedingSite := nil. ^ false ].
+            targetBreedingSite := nil. ]
+        ifFalse: [ 10 timesRepeat: [self moveTo: targetBreedingSite] ].
     ^ arrived
 ]
 
 { #category : 'accessing' }
 DFMosquito >> flyToHuman [
-	| human |
-	human := self nearestHuman.
-	human isNil
-		ifTrue: [ self randomWalk ]
-		ifFalse: [
-			 self moveTowards: human cell ].
-	^human.
+    | human |
+    self randomWalk.
+    human := (self cormasModel allEntitiesOfClass: DFHuman)
+        detect: [ :h | h cell = self cell or: [ self cell neighbourhood includes: h cell ] ]
+        ifNone: [ self randomWalk ].
+    ^ human.
 ]
 
 { #category : 'accessing' }
@@ -125,7 +111,7 @@ DFMosquito >> initialize [
 	ageMax:= 21.
 	currentAge :=0.
 	incubationPeriod:= nil.
-	nbMosquitoesPerBite:= 10.
+	nbMosquitoesPerBite:= 1.
 	targetBreedingSite := nil.
 	reproductionPeriod:=0.	
 ]
@@ -156,12 +142,10 @@ DFMosquito >> nbMosquitoesPerBite: anObject [
 
 { #category : 'accessing' }
 DFMosquito >> nearestHuman [
-	| candidates|
-	candidates := (self cormasModel allEntitiesOfClass: DFHuman)
-		select: [ :h | h cell notNil and: [ (self cell distanceTo: h cell) <= 5 ] ].
-	^ candidates
-		ifEmpty: [ ^nil ]
-		ifNotEmpty: [ candidates detectMin: [ :h | self cell distanceTo: h cell ] ].
+    | humans |
+    humans := self cormasModel allEntitiesOfClass: DFHuman.
+    humans isEmpty ifTrue: [ ^ nil ].
+    ^ humans detectMin: [ :h | self cell distanceTo: h cell ].
 ]
 
 { #category : 'accessing' }
@@ -187,15 +171,6 @@ DFMosquito >> pov [
 	shape: #circle size: 0.2.
 ]
 
-{ #category : 'as yet unclassified' }
-DFMosquito >> reproduce [
-    "Reproduce every reproductionPeriod steps if on breeding site"
-    (self cell hasWater and: [ self currentTimeStep \\ reproductionPeriod = 0 ])
-        ifTrue: [
-				self create: nbMosquitoesPerBite randomlyLocatedEntitiesOfClass: DFMosquito.
-		 ].
-]
-
 { #category : 'accessing' }
 DFMosquito >> reproductionPeriod [
 
@@ -212,7 +187,7 @@ DFMosquito >> reproductionPeriod: anObject [
 DFMosquito >> stepMosquito [
     | human |
     currentAge := currentAge + 1.
-    currentAge >= ageMax ifTrue: [ self delete. ^self ].
+    currentAge >= ageMax ifTrue: [ ^ self delete ].
 
     incubationPeriod isNil ifFalse: [
         incubationPeriod := incubationPeriod - 1.
@@ -220,16 +195,12 @@ DFMosquito >> stepMosquito [
             self isInfected: true.
             incubationPeriod := nil ] ].
 
-		reproductionPeriod > 0 ifTrue: [ 
-      reproductionPeriod := reproductionPeriod - 1.
-        ^ self ].
-
     hasBlood ifFalse: [
         self cell hasWater
             ifTrue: [ self randomWalk ]
             ifFalse: [
                 human := self flyToHuman.
-                human ifNotNil: [ self bite: human ] ] ].
+                human ifNotNil: [ self bite: human. ] ] ].
 ]
 
 { #category : 'accessing' }
@@ -242,4 +213,14 @@ DFMosquito >> targetBreedingSite [
 DFMosquito >> targetBreedingSite: anObject [
 
 	targetBreedingSite := anObject
+]
+
+{ #category : 'as yet unclassified' }
+DFMosquito >> updateState [
+	
+	incubationPeriod isNil ifFalse: [
+			  incubationPeriod := incubationPeriod - 1.
+			  incubationPeriod = 0 ifTrue: [
+					  self isInfected: true.
+					  incubationPeriod := nil ] ] 
 ]
